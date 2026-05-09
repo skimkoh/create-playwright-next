@@ -21,4 +21,4 @@ program
 
 program.parse();
 
-outro(chalk.green("Done 🚀"));
+// outro(chalk.green("Done 🚀"));

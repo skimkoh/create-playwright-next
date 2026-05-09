@@ -1,4 +1,4 @@
-import { confirm, select, spinner } from "@clack/prompts";
+import { cancel, confirm, isCancel, select, spinner } from "@clack/prompts";
 import chalk from "chalk";
 import path from "path";
 import fs from "fs-extra";
@@ -12,15 +12,16 @@ export async function initCommand() {
     process.exit(1);
   }
 
-  const useTS = await confirm({
-    message: "Use TypeScript for Playwright config?",
-    initialValue: true
-  });
-
   const installBrowsers = await confirm({
     message: "Install Playwright browsers now?",
     initialValue: true
   });
+
+  // add cancellation step after each prompt
+  if (isCancel(installBrowsers)) {
+    cancel("Operation cancelled.");
+    process.exit(0);
+  }
 
   const testDir = await select({
     message: "Where should tests live?",
@@ -29,6 +30,11 @@ export async function initCommand() {
       { value: "tests/e2e", label: "tests/e2e/" }
     ]
   });
+
+  if (isCancel(testDir)) {
+    cancel("Operation cancelled.");
+    process.exit(0);
+  }
 
   const s = spinner();
   s.start("Setting up Playwright...");
@@ -40,7 +46,7 @@ export async function initCommand() {
 
     const configPath = path.join(
       cwd,
-      useTS ? "playwright.config.ts" : "playwright.config.js"
+      "playwright.config.ts"
     );
 
     await fs.writeFile(configPath, getConfigTemplate(testDir as string));
