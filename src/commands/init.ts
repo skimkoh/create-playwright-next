@@ -1,4 +1,4 @@
-import { cancel, confirm, isCancel, select, spinner } from "@clack/prompts";
+import { cancel, confirm, isCancel, select, spinner, text } from "@clack/prompts";
 import chalk from "chalk";
 import path from "path";
 import fs from "fs-extra";
@@ -7,20 +7,61 @@ import { execa } from "execa";
 export async function initCommand() {
   const cwd = process.cwd();
 
-  if (!fs.existsSync(path.join(cwd, "package.json"))) {
-    console.log(chalk.red("❌ No package.json found."));
-    process.exit(1);
-  }
-
-  const installBrowsers = await confirm({
-    message: "Install Playwright browsers now?",
-    initialValue: true
+  const standaloneOrInNextProject = await select({
+    message: "Is this a Next.js project or do you want to setup a standalone Playwright project?",
+    options: [
+      { value: "standalone", label: "Standalone Playwright Project" },
+      { value: "next", label: "In Next.js project" }
+    ]
   });
 
-  // add cancellation step after each prompt
-  if (isCancel(installBrowsers)) {
+  // if cancelled, exit early
+  if (isCancel(standaloneOrInNextProject)) {
     cancel("Operation cancelled.");
     process.exit(0);
+  }
+
+
+  if (standaloneOrInNextProject === "standalone") {
+    const projectFolder = await text({
+      message: "What should the standalone Playwright project folder be called?",
+      placeholder: "playwright-project",
+      validate(value) {
+        if (!value) return "Project folder name is required";
+        if (value.includes(" ")) return "Folder name cannot contain spaces";
+      }
+    });
+
+    // if cancelled, exit early
+    if (isCancel(projectFolder)) {
+      cancel("Operation cancelled.");
+      process.exit(0);
+    }
+
+  }
+
+
+  // for next projects
+  if (standaloneOrInNextProject === "next") {
+    const packageJsonPath = path.join(cwd, "package.json");
+
+    if (!fs.existsSync(packageJsonPath)) {
+      console.log(chalk.red("No package.json found."));
+      process.exit(1);
+    }
+
+    const packageJson = fs.readJsonSync(packageJsonPath);
+
+    const hasNext =
+      packageJson.dependencies?.next ||
+      packageJson.devDependencies?.next;
+
+    if (!hasNext) {
+      console.log(
+        chalk.red("This project is not a Next.js project (next dependency not found).")
+      );
+      process.exit(1);
+    }
   }
 
   const testDir = await select({
@@ -68,12 +109,6 @@ export async function initCommand() {
     };
 
     await fs.writeJson(path.join(cwd, "package.json"), pkg, { spaces: 2 });
-
-    if (installBrowsers) {
-      await execa("npx", ["playwright", "install"], {
-        stdio: "inherit"
-      });
-    }
 
     s.stop("Playwright setup complete!");
 
