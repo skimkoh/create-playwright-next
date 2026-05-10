@@ -122,23 +122,16 @@ export async function initCommand() {
 }
 
 function getConfigTemplate(testDir: string) {
-  return `
-import { defineConfig } from '@playwright/test';
+  const templatePath = path.join(
+    __dirname,
+    "../templates/playwright.config.ts"
+  );
 
-export default defineConfig({
-  testDir: './${testDir}',
-  use: {
-    baseURL: 'http://localhost:3000',
-    headless: true
-  },
-  webServer: {
-    command: 'npm run dev',
-    port: 3000,
-    reuseExistingServer: true
-  }
-});
-`;
+  return fs
+    .readFileSync(templatePath, "utf-8")
+    .replace(/\$\{testDir\}/g, testDir);
 }
+
 
 function exampleTestTemplate() {
   return `
