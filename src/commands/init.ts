@@ -11,6 +11,8 @@ import chalk from "chalk";
 import path from "path";
 import fs from "fs-extra";
 import { execa } from "execa";
+import { access } from "node:fs/promises";
+import { resolve } from "node:path";
 
 export async function initCommand() {
   const cwd = process.cwd();
@@ -309,45 +311,23 @@ async function configureGitHubSecrets(cwd: string) {
 async function getGitHubCliInstaller(
   cwd: string
 ): Promise<{ command: string; args: string[] } | undefined> {
-  const candidates =
-    process.platform === "darwin"
-      ? [{ command: "brew", args: ["install", "gh"] }]
-      : process.platform === "win32"
-        ? [{
-            command: "winget",
-            args: [
-              "install",
-              "--id",
-              "GitHub.cli",
-              "--exact",
-              "--accept-package-agreements",
-              "--accept-source-agreements"
-            ]
-          }]
-        : process.platform === "linux"
-          ? [
-              { command: "apt-get", args: ["install", "-y", "gh"] },
-              { command: "dnf", args: ["install", "-y", "gh"] },
-              { command: "yum", args: ["install", "-y", "gh"] },
-              { command: "pacman", args: ["-S", "--noconfirm", "github-cli"] }
-            ]
-          : [];
+  if (process.platform !== "win32") return undefined;
 
-  for (const candidate of candidates) {
-    try {
-      await execa(candidate.command, ["--version"], { cwd });
-      return process.platform === "linux"
-        ? {
-            command: "sudo",
-            args: [candidate.command, ...candidate.args]
-          }
-        : candidate;
-    } catch {
-      // Try the next supported package manager.
-    }
+  const configuredPath = process.env.GH_CLI_MSI_PATH;
+  if (!configuredPath) return undefined;
+
+  const installerPath = resolve(cwd, configuredPath);
+
+  try {
+    await access(installerPath);
+
+    return {
+      command: "msiexec.exe",
+      args: ["/i", installerPath, "/quiet", "/norestart"]
+    };
+  } catch {
+    return undefined;
   }
-
-  return undefined;
 }
 
 function exampleTestTemplate() {
